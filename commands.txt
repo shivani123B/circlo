@@ -1,0 +1,22 @@
+# brew install postgresql@16       -> one time not required
+# brew services start postgresql@16
+
+not reqired:
+---
+If you need to have postgresql@16 first in your PATH, run:
+  echo 'export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"' >> /Users/shivanibondugula/.zshrc
+
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+
+For compilers to find postgresql@16 you may need to set:
+  export LDFLAGS="-L/opt/homebrew/opt/postgresql@16/lib"
+  export CPPFLAGS="-I/opt/homebrew/opt/postgresql@16/include"
+
+For pkgconf to find postgresql@16 you may need to set:
+  export PKG_CONFIG_PATH="/opt/homebrew/opt/postgresql@16/lib/pkgconfig"
+---  
+
+source .venv/bin/activate
+
+
+psql -h localhost -U circlo_user -d circlo_dev -c "SHOW port;"
