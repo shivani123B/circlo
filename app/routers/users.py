@@ -1,16 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
 from .. import models
-from ..schemas import UserCreate, UserOut, UserLogin
-from ..auth import hash_password, verify_password
+from ..auth import create_access_token, hash_password, verify_password
+from ..deps import get_current_user, get_db
+from ..schemas import TokenOut, UserCreate, UserLogin, UserOut, UserRole
 
 router = APIRouter(tags=["users"])
 
 
 @router.post("/users", response_model=UserOut)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    community = (
+        db.query(models.Community)
+        .filter(models.Community.id == user.community_id)
+        .first()
+    )
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found.")
+
     if user.email:
         if db.query(models.User).filter(models.User.email == user.email).first():
             raise HTTPException(status_code=400, detail="Email already registered.")
@@ -25,9 +33,9 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         full_name=user.full_name,
         email=user.email,
         phone=user.phone,
-        flat_number=user.flat_number,
+        flat_no=user.flat_no,
         block_name=user.block_name,
-        role="resident",
+        role=UserRole.resident.value,
         password_hash=hashed_pw,
         community_id=user.community_id,
         is_active=True,
@@ -39,11 +47,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     return db_user
 
 
-@router.post("/login")
+@router.post("/login", response_model=TokenOut)
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
-    if not credentials.email and not credentials.phone:
-        raise HTTPException(status_code=400, detail="Provide email or phone.")
-
     query = db.query(models.User).filter(models.User.is_active == True)
 
     if credentials.email:
@@ -52,15 +57,13 @@ def login(credentials: UserLogin, db: Session = Depends(get_db)):
         query = query.filter(models.User.phone == credentials.phone)
 
     user = query.first()
-    if not user:
+    if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials.")
 
-    if not verify_password(credentials.password, user.password_hash):
-        raise HTTPException(status_code=400, detail="Invalid credentials.")
+    access_token = create_access_token(subject=user.id)
+    return TokenOut(access_token=access_token, user=UserOut.model_validate(user))
 
-    return {
-        "message": "Login successful",
-        "user_id": user.id,
-        "full_name": user.full_name,
-        "community_id": user.community_id,
-    }
+
+@router.get("/users/me", response_model=UserOut)
+def read_current_user(current_user: models.User = Depends(get_current_user)):
+    return current_user

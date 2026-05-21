@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends
+import os
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from ..deps import get_db
@@ -8,7 +11,17 @@ from ..auth import hash_password
 router = APIRouter(prefix="/debug", tags=["debug"])
 
 
-@router.post("/seed")
+# Seed is the bootstrap step that creates the first admin user, so it can't be
+# protected by get_current_user. Instead it requires a shared secret header.
+DEBUG_SEED_TOKEN = os.getenv("DEBUG_SEED_TOKEN")
+
+
+def _require_debug_token(x_debug_token: Optional[str] = Header(default=None)) -> None:
+    if not DEBUG_SEED_TOKEN or x_debug_token != DEBUG_SEED_TOKEN:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+
+@router.post("/seed", dependencies=[Depends(_require_debug_token)])
 def seed_data(db: Session = Depends(get_db)):
     default_community_name = "Alpha Gardens"
     default_city = "Hyderabad"
@@ -44,7 +57,7 @@ def seed_data(db: Session = Depends(get_db)):
             full_name="Alpha Admin",
             email=default_email,
             phone="9999999999",
-            flat_number="A-101",
+            flat_no="A-101",
             block_name="Block A",
             role="admin",
             password_hash=hash_password(default_password),

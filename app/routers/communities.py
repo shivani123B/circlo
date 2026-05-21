@@ -3,7 +3,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_db
+from ..deps import get_db, require_admin
 from .. import models
 from ..schemas import CommunityCreate, CommunityOut
 
@@ -11,7 +11,11 @@ router = APIRouter(prefix="/communities", tags=["communities"])
 
 
 @router.post("", response_model=CommunityOut)
-def create_community(community: CommunityCreate, db: Session = Depends(get_db)):
+def create_community(
+    community: CommunityCreate,
+    db: Session = Depends(get_db),
+    _admin: models.User = Depends(require_admin),
+):
     query = db.query(models.Community).filter(models.Community.name == community.name)
     if community.city:
         query = query.filter(models.Community.city == community.city)
